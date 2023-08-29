@@ -14,28 +14,13 @@ namespace NodeMaker
 {
     public partial class Main : Form
     {
+
+        List<Node> nodes = new List<Node>();
+
         public Main()
         {
             InitializeComponent();
             StartMovement();
-        }
-
-        List<Node> nodes = new List<Node>();
-
-        private Node CreateButton(Point location)
-        {
-            Node n = new Node(location, canvas.Size);
-            n.Visible = false;
-            n.Click += new EventHandler(NodeClick);
-            canvas.Controls.Add(n);
-            return n;
-        }
-
-        private void NodeClick(object sender, EventArgs e)
-        {
-            Node n = (Node)sender;
-            nodes.Remove(n);
-            n.Dispose();
         }
 
         #region Tick Processing
@@ -77,15 +62,15 @@ namespace NodeMaker
             {
                 foreach (Node n2 in nodes)
                 {
-                    if (n1.Location == n2.Location)
+                    if (n1 == n2)
                     {
                         continue;
                     }
-                    penWidth = Math.Max(0, maxPen - (int)(penSensitivity * getDistance(n1.GetCentre(), n2.GetCentre())));
-                    alpha = Math.Max(0, maxAlpha - (int)(alphaSensitivity * getDistance(n1.GetCentre(), n2.GetCentre())));
+                    penWidth = Math.Max(0, maxPen - (int)(penSensitivity * getDistance(n1.getPos(), n2.getPos())));
+                    alpha = Math.Max(0, maxAlpha - (int)(alphaSensitivity * getDistance(n1.getPos(), n2.getPos())));
                     if (alpha > 0 && penWidth > 0)
                     {
-                        g.DrawLine(new Pen(Color.FromArgb(alpha, 0, 255, 255), penWidth), n1.GetCentre(), n2.GetCentre());
+                        g.DrawLine(new Pen(Color.FromArgb(alpha, 0, 255, 255), penWidth), n1.getPos(), n2.getPos());
                     }
                 }
             }
@@ -105,11 +90,13 @@ namespace NodeMaker
 
         #endregion
 
+        #region Form Events
+
         private void FormResize(object sender, EventArgs e)
         {
             foreach (Node n in nodes)
             {
-                n.SetContainer(canvas.Size);
+                n.setContainer(canvas.Size);
             }
         }
 
@@ -118,59 +105,45 @@ namespace NodeMaker
             MouseEventArgs em = (MouseEventArgs)e;
             if (em.Button == MouseButtons.Right)
             {
-                nodes.Add(CreateButton(em.Location));
+                nodes.Add(new Node(em.Location, canvas.Size));
             }
         }
+
+        #endregion
+
     }
 
-    public class Node : Button
+    public class Node
     {
         private doubleVector velocity;
         private doubleVector location;
-        private intVector container;
+        private Size container;
         private Random r = new Random();
-
-        
 
         public Node(Point Location, Size containerSize) : base()
         {
-            SetContainer(containerSize);
+            setContainer(containerSize);
+
             setVelocity(r.NextDouble() * (5 - -5) + -5, r.NextDouble() * (5 - -5) + -5);
 
-            init();
-            
             setPos(Location);
         }
 
-        public void SetContainer(Size s)
+        public void setContainer(Size s)
         {
-            container.X = s.Width;
-            container.Y = s.Height;
+            container.Width = s.Width;
+            container.Height = s.Height;
         }
 
-        private void init()
-        {
-            Width = 10;
-            Height = 10;
-            BackColor = Color.LightGray;
-            Text = "";
-        }
-
-        public Point GetCentre()
+        public Point getPos()
         { 
-            return new Point(Left + Width / 2, Top + Height / 2); 
-        }
-
-        public void setPos(int x, int y)
-        {
-            Location = new Point(x - Width / 2, y - Height / 2);
+            return new Point((int)location.X, (int)location.Y); 
         }
 
         public void setPos(Point p)
         {
-            Location = new Point(p.X - Width / 2, p.Y - Height / 2);
-            location.X = Location.X;
-            location.Y = Location.Y;
+            location.X = p.X;
+            location.Y = p.Y;
         }
 
         public void setVelocity(double x, double y)
@@ -183,45 +156,43 @@ namespace NodeMaker
         {
             location.X += velocity.X;
             location.Y += velocity.Y;
-            Location = new Point((int)location.X, (int)location.Y);
             detectCollisions();
         }
 
         private void detectCollisions()
         {
-            if (Location.X < 0)
+            if (location.X < 0)
             {
                 velocity.X *= -1;
-                Location = new Point(0, Location.Y);
+                location = new doubleVector(0, location.Y);
             }
-            if (Location.X + Width > container.X)
+            if (location.X > container.Width)
             {
                 velocity.X *= -1;
-                Location = new Point(container.X - Width, Location.Y);
+                location = new doubleVector(container.Width, location.Y);
             }
-            if (Location.Y < 0)
+            if (location.Y < 0)
             {
                 velocity.Y *= -1;
-                Location = new Point(Location.X, 0);
+                location = new doubleVector(location.X, 0);
             }
-            if (Location.Y + Height > container.Y)
+            if (location.Y > container.Height)
             {
                 velocity.Y *= -1;
-                Location = new Point(Location.X, container.Y - Height);
+                location = new doubleVector(location.X, container.Height);
             }
         }
-    }
-
-    public struct intVector
-    {
-        public int X;
-        public int Y;
     }
 
     public struct doubleVector
     {
         public double X;
         public double Y;
+        public doubleVector(double x, double y)
+        {
+            X = x;
+            Y = y;
+        }
     }
 }
 
