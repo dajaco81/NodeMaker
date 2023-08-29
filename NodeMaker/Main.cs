@@ -20,45 +20,64 @@ namespace NodeMaker
         public Main()
         {
             InitializeComponent();
-            StartMovement();
+            startMotion();
         }
 
-        #region Tick Processing
+        #region Timing
 
         private Timer NodeTicker;
-        public void StartMovement()
+        public void startMotion()
         {
             NodeTicker = new Timer();
-            NodeTicker.Tick += new EventHandler(TickAllNodes);
+            NodeTicker.Tick += new EventHandler(tickNodes);
             NodeTicker.Interval = 10; // in miliseconds
             NodeTicker.Start();
         }
 
-        Bitmap frameBuffer = new Bitmap(1, 1);
-
-        private void TickAllNodes(object sender, EventArgs e)
+        private void tickNodes(object sender, EventArgs e)
         {
-            frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-            Graphics g = Graphics.FromImage(frameBuffer);
+            if (WindowState == FormWindowState.Minimized) return;
+            tickNodeLocations();
+            renderNodes();
+        }
 
-            g.Clear(Color.Black);
+        #endregion
 
+        #region Updates and Rendering
+        private void tickNodeLocations()
+        {
             foreach (Node n in nodes)
             {
                 n.tick();
             }
+        }
 
-            int alpha;
+        Bitmap frameBuffer = new Bitmap(1, 1);
+
+        static readonly Color CanvasColor = Color.Black;
+        static readonly Color LineColor = Color.Cyan;
+
+        private void renderNodes()
+        {
+            frameBuffer = new Bitmap(canvas.Width, canvas.Height);
+            Graphics g = Graphics.FromImage(frameBuffer);
+
+            g.Clear(CanvasColor);
+
+            int penAlpha;
             int penWidth;
 
             int maxAlpha = 100;
-            int maxPen = 3;
+            int maxWidth = 3;
 
-            double alphaSensitivity = 0.3;
+            int dropDistance = 330;
 
-            double penSensitivity = maxPen * alphaSensitivity / maxAlpha;
+            double alphaGrad = (double)maxAlpha / dropDistance;
+            double widthGrad = (double)maxWidth / dropDistance;
 
-            foreach (Node n1 in nodes) 
+            double NodeSeparation;
+
+            foreach (Node n1 in nodes)
             {
                 foreach (Node n2 in nodes)
                 {
@@ -66,11 +85,12 @@ namespace NodeMaker
                     {
                         continue;
                     }
-                    penWidth = Math.Max(0, maxPen - (int)(penSensitivity * getDistance(n1.getPos(), n2.getPos())));
-                    alpha = Math.Max(0, maxAlpha - (int)(alphaSensitivity * getDistance(n1.getPos(), n2.getPos())));
-                    if (alpha > 0 && penWidth > 0)
+                    NodeSeparation = getDistance(n1.getPos(), n2.getPos());
+                    penAlpha = Math.Max(0, maxAlpha - (int)(alphaGrad * NodeSeparation));
+                    penWidth = Math.Max(0, maxWidth - (int)(widthGrad * NodeSeparation));
+                    if (penAlpha > 0 && penWidth > 0)
                     {
-                        g.DrawLine(new Pen(Color.FromArgb(alpha, 0, 255, 255), penWidth), n1.getPos(), n2.getPos());
+                        g.DrawLine(new Pen(Color.FromArgb(penAlpha, LineColor), penWidth), n1.getPos(), n2.getPos());
                     }
                 }
             }
@@ -83,7 +103,7 @@ namespace NodeMaker
             return (int)Math.Sqrt(Math.Pow((p1.X - p2.X), 2) + Math.Pow((p1.Y - p2.Y), 2));
         }
 
-        private Point GetMidCanvas()
+        private Point getMidCanvas()
         {
             return new Point(canvas.Width / 2, canvas.Height / 2);
         }
