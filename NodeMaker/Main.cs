@@ -28,6 +28,7 @@ namespace NodeMaker
         private void Main_Load(object sender, EventArgs e)
         {
             renderWrapper(initCanvas, flush:true);
+            initNodeLayer();
         }
 
         #endregion
@@ -56,8 +57,13 @@ namespace NodeMaker
 
         Bitmap frameBuffer = new Bitmap(1, 1);
 
+        Bitmap NodeLayer = new Bitmap(1, 1);
+
         static readonly Color CanvasColor = Color.Black;
         static readonly Color LineColor = Color.Cyan;
+        static readonly Color NodeColor = Color.DarkSlateGray;
+
+        static readonly int NodeRadius = 10;
 
         #region Render Wrappers
 
@@ -77,6 +83,7 @@ namespace NodeMaker
 
             f(g);
 
+            g.DrawImage(NodeLayer, 0, 0);
             canvas.Image = frameBuffer;
         }
 
@@ -96,6 +103,7 @@ namespace NodeMaker
 
             f(n, g);
 
+            g.DrawImage(NodeLayer, 0, 0);
             canvas.Image = frameBuffer;
         }
 
@@ -115,10 +123,19 @@ namespace NodeMaker
 
             f(n1, n2, g);
 
+            g.DrawImage(NodeLayer, 0, 0);
             canvas.Image = frameBuffer;
         }
 
         #endregion
+
+        Graphics NodeLayerGraphics;
+
+        private void initNodeLayer()
+        {
+            NodeLayer = new Bitmap(canvas.Width, canvas.Height);
+            NodeLayerGraphics = Graphics.FromImage(NodeLayer);
+        }
 
         private void initCanvas(Graphics g)
         {
@@ -176,6 +193,15 @@ namespace NodeMaker
             }
         }
 
+        private void drawNode(Node n)
+        {
+            Point pos = n.getPos();
+            int left = pos.X - NodeRadius;
+            int top = pos.Y - NodeRadius;
+            int diameter = 2 * NodeRadius;
+            NodeLayerGraphics.FillEllipse(new Pen(NodeColor).Brush, left, top, diameter, diameter);
+        }
+
         private int getDistance(Point p1, Point p2)
         {
             return (int)Math.Sqrt(Math.Pow((p1.X - p2.X), 2) + Math.Pow((p1.Y - p2.Y), 2));
@@ -199,6 +225,7 @@ namespace NodeMaker
             {
                 drawEdge(n1, n2, g);
             }
+            drawNode(n1);
         }
 
         #endregion
