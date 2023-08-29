@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Channels;
 using System.Text;
@@ -27,131 +29,90 @@ namespace NodeMaker
 
         private void Main_Load(object sender, EventArgs e)
         {
-            renderWrapper(initCanvas, flush:true);
-            initNodeLayer();
-        }
-
-        #endregion
-
-        #region Timing
-
-        private Timer NodeTicker;
-
-        public void startMotion()
-        {
-            NodeTicker = new Timer();
-            NodeTicker.Tick += new EventHandler(tickNodes);
-            NodeTicker.Interval = 10; // in miliseconds
-            NodeTicker.Start();
-        }
-
-        private void tickNodes(object sender, EventArgs e)
-        {
-            if (WindowState == FormWindowState.Minimized) return;
-            renderWrapper(renderNodes);
+            renderAll();
         }
 
         #endregion
 
         #region Updates and Rendering
 
-        Bitmap frameBuffer = new Bitmap(1, 1);
+        #region Render Properties
 
-        Bitmap NodeLayer = new Bitmap(1, 1);
-
-        static readonly Color CanvasColor = Color.Black;
+        static readonly Color BackdropColor = Color.Black;
         static readonly Color LineColor = Color.Cyan;
         static readonly Color NodeColor = Color.DarkSlateGray;
 
-        static readonly int NodeRadius = 10;
+        static readonly int NodeRadius = 20;
+
+        Bitmap frameBuffer = new Bitmap(1, 1);
+
+        Bitmap[] layers = new Bitmap[] { new Bitmap(1, 1), new Bitmap(1, 1), new Bitmap(1, 1) };
+
+        #endregion
 
         #region Render Wrappers
 
-        private void renderWrapper(Action<Graphics> f, bool flush = false)
+        private void renderWrapper(Action<Graphics> f, int layer, bool resize = false)
         {
-            Graphics g;
-            if (flush)
+            if (resize)
             {
                 frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-                g = Graphics.FromImage(frameBuffer);
-                g.Clear(CanvasColor);
+                layers[layer] = new Bitmap(canvas.Width, canvas.Height);
             }
-            else
+
+            Graphics g = Graphics.FromImage(frameBuffer);
+
+            f(Graphics.FromImage(layers[layer]));
+
+            foreach (Bitmap l in layers)
             {
-                g = Graphics.FromImage(frameBuffer);
+                g.DrawImage(l, 0, 0);
             }
 
-            f(g);
-
-            g.DrawImage(NodeLayer, 0, 0);
             canvas.Image = frameBuffer;
         }
 
-        private void renderWrapper(Node n, Action<Node, Graphics> f, bool flush = false)
+        private void renderWrapper(Node n, Action<Node, Graphics> f, int layer, bool resize = false)
         {
-            Graphics g;
-            if (flush)
+            if (resize)
             {
                 frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-                g = Graphics.FromImage(frameBuffer);
-                g.Clear(CanvasColor);
+                layers[layer] = new Bitmap(canvas.Width, canvas.Height);
             }
-            else
+
+            Graphics g = Graphics.FromImage(frameBuffer);
+
+            f(n, Graphics.FromImage(layers[layer]));
+
+            foreach (Bitmap l in layers)
             {
-                g = Graphics.FromImage(frameBuffer);
+                g.DrawImage(l, 0, 0);
             }
 
-            f(n, g);
-
-            g.DrawImage(NodeLayer, 0, 0);
             canvas.Image = frameBuffer;
         }
 
-        private void renderWrapper(Node n1, Node n2, Action<Node, Node, Graphics> f, bool flush = false)
+        private void renderWrapper(Node n1, Node n2, Action<Node, Node, Graphics> f, int layer, bool resize = false)
         {
-            Graphics g;
-            if (flush)
+            if (resize)
             {
                 frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-                g = Graphics.FromImage(frameBuffer);
-                g.Clear(CanvasColor);
+                layers[layer] = new Bitmap(canvas.Width, canvas.Height);
             }
-            else
+
+            Graphics g = Graphics.FromImage(frameBuffer);
+
+            f(n1, n2, Graphics.FromImage(layers[layer]));
+
+            foreach (Bitmap l in layers)
             {
-                g = Graphics.FromImage(frameBuffer);
+                g.DrawImage(l, 0, 0);
             }
 
-            f(n1, n2, g);
-
-            g.DrawImage(NodeLayer, 0, 0);
             canvas.Image = frameBuffer;
         }
 
         #endregion
-
-        Graphics NodeLayerGraphics;
-
-        private void initNodeLayer()
-        {
-            NodeLayer = new Bitmap(canvas.Width, canvas.Height);
-            NodeLayerGraphics = Graphics.FromImage(NodeLayer);
-        }
-
-        private void initCanvas(Graphics g)
-        {
-            
-        }
-
-        private void renderNodes(Graphics g)
-        {
-            foreach (Node n1 in nodes)
-            {
-                foreach (Node n2 in nodes)
-                {
-                    drawEdge(n1, n2, g);
-                }
-            }
-        }
 
         #region Edge Rendering Parameters
 
@@ -170,11 +131,27 @@ namespace NodeMaker
 
         private void initEdgeVals()
         {
-            alphaGrad = (double) maxAlpha / dropDistance;
-            widthGrad = (double) maxWidth / dropDistance;
+            alphaGrad = (double)maxAlpha / dropDistance;
+            widthGrad = (double)maxWidth / dropDistance;
         }
 
         #endregion
+
+        #region Render Procedures
+
+        private void drawNodeAtLocation(Point pos, Color c, Graphics g)
+        {
+            int left = pos.X - NodeRadius;
+            int top = pos.Y - NodeRadius;
+            int diameter = 2 * NodeRadius;
+
+            g.FillEllipse(new Pen(c).Brush, left, top, diameter, diameter);
+        }
+
+        private void drawNode(Node n, Graphics g)
+        {
+            drawNodeAtLocation(n.getPos(), NodeColor, g);
+        }
 
         private void drawEdge(Node n1, Node n2, Graphics g)
         {
@@ -193,39 +170,69 @@ namespace NodeMaker
             }
         }
 
-        private void drawNode(Node n)
+        private void drawNodeEdges(Node n, Graphics g)
         {
-            Point pos = n.getPos();
-            int left = pos.X - NodeRadius;
-            int top = pos.Y - NodeRadius;
-            int diameter = 2 * NodeRadius;
-            NodeLayerGraphics.FillEllipse(new Pen(NodeColor).Brush, left, top, diameter, diameter);
+            foreach (Node n2 in nodes)
+            {
+                drawEdge(n, n2, g);
+            }
         }
 
-        private int getDistance(Point p1, Point p2)
+        private void renderNewNode(Node n)
         {
-            return (int)Math.Sqrt(Math.Pow((p1.X - p2.X), 2) + Math.Pow((p1.Y - p2.Y), 2));
-        }
-
-        private Point getMidCanvas()
-        {
-            return new Point(canvas.Width / 2, canvas.Height / 2);
+            renderWrapper(n, drawNodeEdges, (int)Layers.Edges);
+            renderWrapper(n, drawNode, (int)Layers.Nodes);
         }
 
         private void addNewNode(Node n)
         {
             nodes.Add(n);
-            renderWrapper(n, renderNode);
-
+            renderNewNode(n);
         }
 
-        private void renderNode(Node n1, Graphics g)
+        #region Total Renders
+
+        private void renderBackdrop(Graphics g)
         {
-            foreach (Node n2 in nodes)
+            g.Clear(BackdropColor);
+        }
+
+        private void renderAllEdges(Graphics g)
+        {
+            foreach (Node n1 in nodes)
             {
-                drawEdge(n1, n2, g);
+                foreach (Node n2 in nodes)
+                {
+                    drawEdge(n1, n2, g);
+                }
             }
-            drawNode(n1);
+        }
+
+        private void renderAllNodes(Graphics g)
+        {
+            foreach (Node n in nodes)
+            {
+                drawNode(n, g);
+            }
+        }
+
+        private void renderAll()
+        {
+            renderWrapper(renderBackdrop, (int)Layers.Backdrop, resize: true);
+            renderWrapper(renderAllEdges, (int)Layers.Edges, resize: true);
+            renderWrapper(renderAllNodes, (int)Layers.Nodes, resize: true);
+        }
+
+        #endregion
+
+        #endregion
+
+        #endregion
+
+        #region Calculations
+        private int getDistance(Point p1, Point p2)
+        {
+            return (int)Math.Sqrt(Math.Pow((p1.X - p2.X), 2) + Math.Pow((p1.Y - p2.Y), 2));
         }
 
         #endregion
@@ -238,7 +245,7 @@ namespace NodeMaker
             {
                 n.setContainer(canvas.Size);
             }
-            renderWrapper(renderNodes, flush:true);
+            renderAll();
         }
 
         private void FormClick(object sender, EventArgs e)
@@ -248,52 +255,104 @@ namespace NodeMaker
             {
                 addNewNode(new Node(em.Location, canvas.Size));
             }
-            
+
         }
 
         #endregion
 
-    }
+        #region Node Selection
 
-    public class Node
-    {
-        private doubleVector location;
-        private Size container;
+        readonly static Color SelectedNodeColor = Color.Green;
 
-        public Node(Point Location, Size containerSize) : base()
+        List<Node> activeNodes = new List<Node>();
+        List<Node> finishedNodes = new List<Node>();
+
+        private void selectNode(Node n, Graphics g)
         {
-            setContainer(containerSize);
-
-            setPos(Location);
+            drawNodeAtLocation(n.getPos(), SelectedNodeColor, g);
         }
 
-        public void setContainer(Size s)
+        private void deselectNode(Node n, Graphics g)
         {
-            container.Width = s.Width;
-            container.Height = s.Height;
+            drawNode(n, g);
         }
 
-        public Point getPos()
-        { 
-            return new Point((int)location.X, (int)location.Y); 
+        private void canvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            foreach (Node n in activeNodes)
+            {
+                if (getDistance(e.Location, n.getPos()) > NodeRadius)
+                {
+                    renderWrapper(n, deselectNode, (int)Layers.Nodes);
+                    finishedNodes.Add(n);
+                }
+            }
+
+            foreach (Node n in finishedNodes)
+            {
+                activeNodes.Remove(n);
+            }
+            finishedNodes.Clear();
+
+            foreach (Node n in nodes)
+            {
+                if (getDistance(e.Location, n.getPos()) <= NodeRadius && !activeNodes.Contains(n))
+                {
+                    renderWrapper(n, selectNode, (int)Layers.Nodes);
+                    activeNodes.Add(n);
+                }
+            }
         }
 
-        public void setPos(Point p)
+        #endregion
+
+        public enum Layers
         {
-            location.X = p.X;
-            location.Y = p.Y;
+            Backdrop,
+            Edges,
+            Nodes
         }
 
-    }
-
-    public struct doubleVector
-    {
-        public double X;
-        public double Y;
-        public doubleVector(double x, double y)
+        public class Node
         {
-            X = x;
-            Y = y;
+            private doubleVector location;
+            private Size container;
+
+            public Node(Point Location, Size containerSize) : base()
+            {
+                setContainer(containerSize);
+
+                setPos(Location);
+            }
+
+            public void setContainer(Size s)
+            {
+                container.Width = s.Width;
+                container.Height = s.Height;
+            }
+
+            public Point getPos()
+            {
+                return new Point((int)location.X, (int)location.Y);
+            }
+
+            public void setPos(Point p)
+            {
+                location.X = p.X;
+                location.Y = p.Y;
+            }
+
+        }
+
+        public struct doubleVector
+        {
+            public double X;
+            public double Y;
+            public doubleVector(double x, double y)
+            {
+                X = x;
+                Y = y;
+            }
         }
     }
 }
