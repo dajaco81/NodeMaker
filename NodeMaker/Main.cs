@@ -15,17 +15,27 @@ namespace NodeMaker
     public partial class Main : Form
     {
 
+        #region Init
+
         List<Node> nodes = new List<Node>();
 
         public Main()
         {
             InitializeComponent();
-            startMotion();
+            initEdgeVals();
         }
+
+        private void Main_Load(object sender, EventArgs e)
+        {
+            renderWrapper(initCanvas, flush:true);
+        }
+
+        #endregion
 
         #region Timing
 
         private Timer NodeTicker;
+
         public void startMotion()
         {
             NodeTicker = new Timer();
@@ -37,65 +47,133 @@ namespace NodeMaker
         private void tickNodes(object sender, EventArgs e)
         {
             if (WindowState == FormWindowState.Minimized) return;
-            tickNodeLocations();
-            renderNodes();
+            renderWrapper(renderNodes);
         }
 
         #endregion
 
         #region Updates and Rendering
-        private void tickNodeLocations()
-        {
-            foreach (Node n in nodes)
-            {
-                n.tick();
-            }
-        }
 
         Bitmap frameBuffer = new Bitmap(1, 1);
 
         static readonly Color CanvasColor = Color.Black;
         static readonly Color LineColor = Color.Cyan;
 
-        private void renderNodes()
+        #region Render Wrappers
+
+        private void renderWrapper(Action<Graphics> f, bool flush = false)
         {
-            frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-            Graphics g = Graphics.FromImage(frameBuffer);
+            Graphics g;
+            if (flush)
+            {
+                frameBuffer = new Bitmap(canvas.Width, canvas.Height);
+                g = Graphics.FromImage(frameBuffer);
+                g.Clear(CanvasColor);
+            }
+            else
+            {
+                g = Graphics.FromImage(frameBuffer);
+            }
 
-            g.Clear(CanvasColor);
+            f(g);
 
-            int penAlpha;
-            int penWidth;
+            canvas.Image = frameBuffer;
+        }
 
-            int maxAlpha = 100;
-            int maxWidth = 3;
+        private void renderWrapper(Node n, Action<Node, Graphics> f, bool flush = false)
+        {
+            Graphics g;
+            if (flush)
+            {
+                frameBuffer = new Bitmap(canvas.Width, canvas.Height);
+                g = Graphics.FromImage(frameBuffer);
+                g.Clear(CanvasColor);
+            }
+            else
+            {
+                g = Graphics.FromImage(frameBuffer);
+            }
 
-            int dropDistance = 330;
+            f(n, g);
 
-            double alphaGrad = (double)maxAlpha / dropDistance;
-            double widthGrad = (double)maxWidth / dropDistance;
+            canvas.Image = frameBuffer;
+        }
 
-            double NodeSeparation;
+        private void renderWrapper(Node n1, Node n2, Action<Node, Node, Graphics> f, bool flush = false)
+        {
+            Graphics g;
+            if (flush)
+            {
+                frameBuffer = new Bitmap(canvas.Width, canvas.Height);
+                g = Graphics.FromImage(frameBuffer);
+                g.Clear(CanvasColor);
+            }
+            else
+            {
+                g = Graphics.FromImage(frameBuffer);
+            }
 
+            f(n1, n2, g);
+
+            canvas.Image = frameBuffer;
+        }
+
+        #endregion
+
+        private void initCanvas(Graphics g)
+        {
+            
+        }
+
+        private void renderNodes(Graphics g)
+        {
             foreach (Node n1 in nodes)
             {
                 foreach (Node n2 in nodes)
                 {
-                    if (n1 == n2)
-                    {
-                        continue;
-                    }
-                    NodeSeparation = getDistance(n1.getPos(), n2.getPos());
-                    penAlpha = Math.Max(0, maxAlpha - (int)(alphaGrad * NodeSeparation));
-                    penWidth = Math.Max(0, maxWidth - (int)(widthGrad * NodeSeparation));
-                    if (penAlpha > 0 && penWidth > 0)
-                    {
-                        g.DrawLine(new Pen(Color.FromArgb(penAlpha, LineColor), penWidth), n1.getPos(), n2.getPos());
-                    }
+                    drawEdge(n1, n2, g);
                 }
             }
+        }
 
-            canvas.Image = frameBuffer;
+        #region Edge Rendering Parameters
+
+        int penAlpha;
+        int penWidth;
+
+        const int maxAlpha = 100;
+        const int maxWidth = 3;
+
+        const int dropDistance = 330;
+
+        double alphaGrad;
+        double widthGrad;
+
+        double NodeSeparation;
+
+        private void initEdgeVals()
+        {
+            alphaGrad = (double) maxAlpha / dropDistance;
+            widthGrad = (double) maxWidth / dropDistance;
+        }
+
+        #endregion
+
+        private void drawEdge(Node n1, Node n2, Graphics g)
+        {
+            if (n1 == n2)
+            {
+                return;
+            }
+
+            NodeSeparation = getDistance(n1.getPos(), n2.getPos());
+            penAlpha = Math.Max(0, maxAlpha - (int)(alphaGrad * NodeSeparation));
+            penWidth = Math.Max(0, maxWidth - (int)(widthGrad * NodeSeparation));
+
+            if (penAlpha > 0 && penWidth > 0)
+            {
+                g.DrawLine(new Pen(Color.FromArgb(penAlpha, LineColor), penWidth), n1.getPos(), n2.getPos());
+            }
         }
 
         private int getDistance(Point p1, Point p2)
@@ -108,6 +186,21 @@ namespace NodeMaker
             return new Point(canvas.Width / 2, canvas.Height / 2);
         }
 
+        private void addNewNode(Node n)
+        {
+            nodes.Add(n);
+            renderWrapper(n, renderNode);
+
+        }
+
+        private void renderNode(Node n1, Graphics g)
+        {
+            foreach (Node n2 in nodes)
+            {
+                drawEdge(n1, n2, g);
+            }
+        }
+
         #endregion
 
         #region Form Events
@@ -118,6 +211,7 @@ namespace NodeMaker
             {
                 n.setContainer(canvas.Size);
             }
+            renderWrapper(renderNodes, flush:true);
         }
 
         private void FormClick(object sender, EventArgs e)
@@ -125,8 +219,9 @@ namespace NodeMaker
             MouseEventArgs em = (MouseEventArgs)e;
             if (em.Button == MouseButtons.Right)
             {
-                nodes.Add(new Node(em.Location, canvas.Size));
+                addNewNode(new Node(em.Location, canvas.Size));
             }
+            
         }
 
         #endregion
@@ -135,16 +230,12 @@ namespace NodeMaker
 
     public class Node
     {
-        private doubleVector velocity;
         private doubleVector location;
         private Size container;
-        private Random r = new Random();
 
         public Node(Point Location, Size containerSize) : base()
         {
             setContainer(containerSize);
-
-            setVelocity(r.NextDouble() * (5 - -5) + -5, r.NextDouble() * (5 - -5) + -5);
 
             setPos(Location);
         }
@@ -166,42 +257,6 @@ namespace NodeMaker
             location.Y = p.Y;
         }
 
-        public void setVelocity(double x, double y)
-        {
-            velocity.X = x;
-            velocity.Y = y;
-        }
-
-        public void tick()
-        {
-            location.X += velocity.X;
-            location.Y += velocity.Y;
-            detectCollisions();
-        }
-
-        private void detectCollisions()
-        {
-            if (location.X < 0)
-            {
-                velocity.X *= -1;
-                location = new doubleVector(0, location.Y);
-            }
-            if (location.X > container.Width)
-            {
-                velocity.X *= -1;
-                location = new doubleVector(container.Width, location.Y);
-            }
-            if (location.Y < 0)
-            {
-                velocity.Y *= -1;
-                location = new doubleVector(location.X, 0);
-            }
-            if (location.Y > container.Height)
-            {
-                velocity.Y *= -1;
-                location = new doubleVector(location.X, container.Height);
-            }
-        }
     }
 
     public struct doubleVector
