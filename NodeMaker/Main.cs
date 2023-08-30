@@ -131,6 +131,10 @@ namespace NodeMaker
         {
             foreach (Node n in nodes)
             {
+                if (p.mainNode == n)
+                {
+                    continue;
+                }
                 drawEdge(new renderParams(p.layer, p.color, p.mainNode, n), g);
             }
         }
@@ -184,7 +188,7 @@ namespace NodeMaker
         #region Calculations
         private int getDistance(Point p1, Point p2)
         {
-            return (int)Math.Sqrt(Math.Pow((p1.X - p2.X), 2) + Math.Pow((p1.Y - p2.Y), 2));
+            return (int)Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
         }
 
         #endregion
@@ -193,10 +197,6 @@ namespace NodeMaker
 
         private void FormResize(object sender, EventArgs e)
         {
-            foreach (Node n in nodes)
-            {
-                n.setContainer(canvas.Size);
-            }
             renderAll();
         }
 
@@ -205,7 +205,7 @@ namespace NodeMaker
             MouseEventArgs em = (MouseEventArgs)e;
             if (em.Button == MouseButtons.Right)
             {
-                addNewNode(new Node(em.Location, canvas.Size));
+                addNewNode(new Node(em.Location));
             }
 
         }
@@ -262,23 +262,15 @@ namespace NodeMaker
         public class Node
         {
             private doubleVector location;
-            private Size container;
 
             public State state;
             public State oldState;
 
-            public Node(Point Location, Size containerSize) : base()
+            public Node(Point Location) : base()
             {
-                setContainer(containerSize);
                 setPos(Location);
                 state = State.None;
                 oldState = State.None;
-            }
-
-            public void setContainer(Size s)
-            {
-                container.Width = s.Width;
-                container.Height = s.Height;
             }
 
             public Point getPos()
