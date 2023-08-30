@@ -264,9 +264,6 @@ namespace NodeMaker
 
         readonly static Color SelectedNodeColor = Color.Green;
 
-        List<Node> activeNodes = new List<Node>();
-        List<Node> finishedNodes = new List<Node>();
-
         private void selectNode(Node n, Graphics g)
         {
             drawNodeAtLocation(n.getPos(), SelectedNodeColor, g);
@@ -279,27 +276,28 @@ namespace NodeMaker
 
         private void canvas_MouseMove(object sender, MouseEventArgs e)
         {
-            foreach (Node n in activeNodes)
-            {
-                if (getDistance(e.Location, n.getPos()) > NodeRadius)
-                {
-                    renderWrapper(n, deselectNode, (int)Layers.Nodes);
-                    finishedNodes.Add(n);
-                }
-            }
-
-            foreach (Node n in finishedNodes)
-            {
-                activeNodes.Remove(n);
-            }
-            finishedNodes.Clear();
-
             foreach (Node n in nodes)
             {
-                if (getDistance(e.Location, n.getPos()) <= NodeRadius && !activeNodes.Contains(n))
+                if (getDistance(e.Location, n.getPos()) <= NodeRadius)
                 {
-                    renderWrapper(n, selectNode, (int)Layers.Nodes);
-                    activeNodes.Add(n);
+                    n.state = State.Hover;
+                }
+                else
+                {
+                    n.state = State.None;
+                }
+
+                if (n.stateChanged())
+                {
+                    switch (n.state) 
+                    {
+                        case State.Hover:
+                            renderWrapper(n, selectNode, (int)Layers.Nodes);
+                            break;
+                        case State.None:
+                            renderWrapper(n, deselectNode, (int)Layers.Nodes);
+                            break;
+                    }
                 }
             }
         }
@@ -313,16 +311,26 @@ namespace NodeMaker
             Nodes
         }
 
+        public enum State
+        {
+            None,
+            Hover
+        }
+
         public class Node
         {
             private doubleVector location;
             private Size container;
 
+            public State state;
+            public State oldState;
+
             public Node(Point Location, Size containerSize) : base()
             {
                 setContainer(containerSize);
-
                 setPos(Location);
+                state = State.None;
+                oldState = State.None;
             }
 
             public void setContainer(Size s)
@@ -340,6 +348,16 @@ namespace NodeMaker
             {
                 location.X = p.X;
                 location.Y = p.Y;
+            }
+
+            public bool stateChanged()
+            {
+                if (state != oldState)
+                {
+                    oldState = state;
+                    return true;
+                }
+                return false;
             }
 
         }
