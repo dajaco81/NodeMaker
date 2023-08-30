@@ -107,6 +107,11 @@ namespace NodeMaker
             int top = pos.Y - NodeRadius;
             int diameter = 2 * NodeRadius;
 
+            if (p.mainNode.Selected())
+            {
+                p.color = SelectedNodeColor;
+            }
+
             g.FillEllipse(new Pen(p.color).Brush, left, top, diameter, diameter);
         }
 
@@ -135,7 +140,14 @@ namespace NodeMaker
                 {
                     continue;
                 }
-                drawEdge(new renderParams(p.layer, p.color, p.mainNode, n), g);
+                if (n.Selected() || p.mainNode.Selected())
+                {
+                    drawEdge(new renderParams(p.layer, SelectedEdgeColor, p.mainNode, n), g);
+                }
+                else
+                {
+                    drawEdge(new renderParams(p.layer, p.color, p.mainNode, n), g);
+                }
             }
         }
 
@@ -144,6 +156,13 @@ namespace NodeMaker
             nodes.Add(n);
             renderWrapper(new renderParams(Layer.Edges, EdgeColor, n), drawNodeEdges);
             renderWrapper(new renderParams(Layer.Nodes, NodeColor, n), drawNode);
+        }
+
+        private void removeNode(Node n)
+        {
+            nodes.Remove(n);
+
+            renderAll();
         }
 
         #region Total Renders
@@ -155,12 +174,9 @@ namespace NodeMaker
 
         private void renderAllEdges(renderParams p, Graphics g)
         {
-            foreach (Node n1 in nodes)
+            foreach (Node n in nodes)
             {
-                foreach (Node n2 in nodes)
-                {
-                    drawEdge(new renderParams(p.layer, p.color, n1, n2), g);
-                }
+                drawNodeEdges(new renderParams(p.layer, p.color, n), g);
             }
         }
 
@@ -202,10 +218,35 @@ namespace NodeMaker
 
         private void FormClick(object sender, EventArgs e)
         {
+            bool foundNode = false;
+
             MouseEventArgs em = (MouseEventArgs)e;
             if (em.Button == MouseButtons.Right)
             {
-                addNewNode(new Node(em.Location));
+                for (int n = nodes.Count - 1; n >= 0; n--)
+                {
+                    if (nodes[n].hoverState == State.Hover)
+                    {
+                        removeNode(nodes[n]);
+                    }
+                }
+            }
+
+            if (em.Button == MouseButtons.Left)
+            {
+                foreach (Node n in nodes)
+                {
+                    if (n.hoverState == State.Hover)
+                    {
+                        n.changeSelectedState();
+                        clickNode(n);
+                        foundNode = true;
+                    }
+                }
+                if (!foundNode)
+                {
+                    addNewNode(new Node(em.Location));
+                }
             }
 
         }
@@ -214,16 +255,32 @@ namespace NodeMaker
 
         #region Node Selection
 
-        readonly static Color SelectedNodeColor = Color.Green;
-        readonly static Color SelectedEdgeColor = Color.Red;
+        readonly static Color HoverNodeColor = Color.Green;
+        readonly static Color HoverEdgeColor = Color.Red;
+        readonly static Color SelectedNodeColor = Color.Yellow;
+        readonly static Color SelectedEdgeColor = Color.Orange;
 
-        private void selectNode(Node n)
+        private void clickNode(Node n)
         {
-            renderWrapper(new renderParams(Layer.Nodes, SelectedNodeColor, n), drawNode);
-            renderWrapper(new renderParams(Layer.Edges, SelectedEdgeColor, n), drawNodeEdges);
+            if (n.selectedState == State.Selected)
+            {
+                renderWrapper(new renderParams(Layer.Nodes, SelectedNodeColor, n), drawNode);
+                renderWrapper(new renderParams(Layer.Edges, SelectedEdgeColor, n), drawNodeEdges);
+            }
+            else
+            {
+                renderWrapper(new renderParams(Layer.Nodes, NodeColor, n), drawNode);
+                renderWrapper(new renderParams(Layer.Edges, EdgeColor, n), drawNodeEdges);
+            }
         }
 
-        private void deselectNode(Node n)
+        private void hoverNode(Node n)
+        {
+            renderWrapper(new renderParams(Layer.Nodes, HoverNodeColor, n), drawNode);
+            renderWrapper(new renderParams(Layer.Edges, HoverEdgeColor, n), drawNodeEdges);
+        }
+
+        private void dehoverNode(Node n)
         {
             renderWrapper(new renderParams(Layer.Nodes, NodeColor, n), drawNode);
             renderWrapper(new renderParams(Layer.Edges, EdgeColor, n), drawNodeEdges);
@@ -235,22 +292,22 @@ namespace NodeMaker
             {
                 if (getDistance(e.Location, n.getPos()) <= NodeRadius)
                 {
-                    n.state = State.Hover;
+                    n.hoverState = State.Hover;
                 }
                 else
                 {
-                    n.state = State.None;
+                    n.hoverState = State.None;
                 }
 
-                if (n.stateChanged())
+                if (n.hoverStateChanged() && !n.Selected())
                 {
-                    switch (n.state) 
+                    switch (n.hoverState) 
                     {
                         case State.Hover:
-                            selectNode(n);
+                            hoverNode(n);
                             break;
                         case State.None:
-                            deselectNode(n);
+                            dehoverNode(n);
                             break;
                     }
                 }
@@ -263,14 +320,16 @@ namespace NodeMaker
         {
             private doubleVector location;
 
-            public State state;
-            public State oldState;
+            public State selectedState;
+            public State hoverState;
+            public State oldHoverState;
 
             public Node(Point Location) : base()
             {
                 setPos(Location);
-                state = State.None;
-                oldState = State.None;
+                selectedState = State.None;
+                hoverState = State.None;
+                oldHoverState = State.None;
             }
 
             public Point getPos()
@@ -284,14 +343,32 @@ namespace NodeMaker
                 location.Y = p.Y;
             }
 
-            public bool stateChanged()
+            public bool hoverStateChanged()
             {
-                if (state != oldState)
+                if (hoverState != oldHoverState)
                 {
-                    oldState = state;
+                    oldHoverState = hoverState;
                     return true;
                 }
                 return false;
+            }
+
+            public void changeSelectedState()
+            {
+                switch(selectedState) 
+                {
+                    case State.None:
+                        selectedState = State.Selected;
+                        break;
+                    case State.Selected:
+                        selectedState = State.None;
+                        break;
+                }
+            }
+
+            public bool Selected()
+            {
+                return selectedState == State.Selected;
             }
 
         }
@@ -339,7 +416,8 @@ namespace NodeMaker
         public enum State
         {
             None,
-            Hover
+            Hover,
+            Selected
         }
 
         #endregion
