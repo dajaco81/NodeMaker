@@ -79,7 +79,8 @@ namespace NodeMaker
         int penAlpha;
         int penWidth;
 
-        const int maxAlpha = 100;
+        //const int maxAlpha = 100;
+        const int maxAlpha = 255;
         const int maxWidth = 3;
 
         const int dropDistance = 330;
@@ -214,15 +215,18 @@ namespace NodeMaker
         #region Node Selection
 
         readonly static Color SelectedNodeColor = Color.Green;
+        readonly static Color SelectedEdgeColor = Color.Red;
 
         private void selectNode(Node n)
         {
             renderWrapper(new renderParams(Layer.Nodes, SelectedNodeColor, n), drawNode);
+            renderWrapper(new renderParams(Layer.Edges, SelectedEdgeColor, n), drawNodeEdges);
         }
 
         private void deselectNode(Node n)
         {
             renderWrapper(new renderParams(Layer.Nodes, NodeColor, n), drawNode);
+            renderWrapper(new renderParams(Layer.Edges, EdgeColor, n), drawNodeEdges);
         }
 
         private void canvas_MouseMove(object sender, MouseEventArgs e)
