@@ -24,11 +24,11 @@ namespace NodeMaker
         public Main()
         {
             InitializeComponent();
-            initEdgeVals();
         }
 
         private void Main_Load(object sender, EventArgs e)
         {
+            initEdgeVals();
             renderAll();
         }
 
@@ -39,7 +39,7 @@ namespace NodeMaker
         #region Render Properties
 
         static readonly Color BackdropColor = Color.Black;
-        static readonly Color LineColor = Color.Cyan;
+        static readonly Color EdgeColor = Color.Cyan;
         static readonly Color NodeColor = Color.DarkSlateGray;
 
         static readonly int NodeRadius = 20;
@@ -52,57 +52,17 @@ namespace NodeMaker
 
         #region Render Wrappers
 
-        private void renderWrapper(Action<Graphics> f, int layer, bool resize = false)
+        private void renderWrapper(renderParams p, Action<renderParams, Graphics> f, bool resize = false)
         {
             if (resize)
             {
                 frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-                layers[layer] = new Bitmap(canvas.Width, canvas.Height);
+                layers[(int)p.layer] = new Bitmap(canvas.Width, canvas.Height);
             }
 
             Graphics g = Graphics.FromImage(frameBuffer);
 
-            f(Graphics.FromImage(layers[layer]));
-
-            foreach (Bitmap l in layers)
-            {
-                g.DrawImage(l, 0, 0);
-            }
-
-            canvas.Image = frameBuffer;
-        }
-
-        private void renderWrapper(Node n, Action<Node, Graphics> f, int layer, bool resize = false)
-        {
-            if (resize)
-            {
-                frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-                layers[layer] = new Bitmap(canvas.Width, canvas.Height);
-            }
-
-            Graphics g = Graphics.FromImage(frameBuffer);
-
-            f(n, Graphics.FromImage(layers[layer]));
-
-            foreach (Bitmap l in layers)
-            {
-                g.DrawImage(l, 0, 0);
-            }
-
-            canvas.Image = frameBuffer;
-        }
-
-        private void renderWrapper(Node n1, Node n2, Action<Node, Node, Graphics> f, int layer, bool resize = false)
-        {
-            if (resize)
-            {
-                frameBuffer = new Bitmap(canvas.Width, canvas.Height);
-                layers[layer] = new Bitmap(canvas.Width, canvas.Height);
-            }
-
-            Graphics g = Graphics.FromImage(frameBuffer);
-
-            f(n1, n2, Graphics.FromImage(layers[layer]));
+            f(p, Graphics.FromImage(layers[(int)p.layer]));
 
             foreach (Bitmap l in layers)
             {
@@ -139,88 +99,79 @@ namespace NodeMaker
 
         #region Render Procedures
 
-        private void drawNodeAtLocation(Point pos, Color c, Graphics g)
+        private void drawNode(renderParams p, Graphics g)
         {
+            Point pos = p.mainNode.getPos();
             int left = pos.X - NodeRadius;
             int top = pos.Y - NodeRadius;
             int diameter = 2 * NodeRadius;
 
-            g.FillEllipse(new Pen(c).Brush, left, top, diameter, diameter);
+            g.FillEllipse(new Pen(p.color).Brush, left, top, diameter, diameter);
         }
 
-        private void drawNode(Node n, Graphics g)
+        private void drawEdge(renderParams p, Graphics g)
         {
-            drawNodeAtLocation(n.getPos(), NodeColor, g);
-        }
-
-        private void drawEdge(Node n1, Node n2, Graphics g)
-        {
-            if (n1 == n2)
+            if (p.mainNode == p.secondaryNode)
             {
                 return;
             }
 
-            NodeSeparation = getDistance(n1.getPos(), n2.getPos());
+            NodeSeparation = getDistance(p.mainNode.getPos(), p.secondaryNode.getPos());
             penAlpha = Math.Max(0, maxAlpha - (int)(alphaGrad * NodeSeparation));
             penWidth = Math.Max(0, maxWidth - (int)(widthGrad * NodeSeparation));
 
             if (penAlpha > 0 && penWidth > 0)
             {
-                g.DrawLine(new Pen(Color.FromArgb(penAlpha, LineColor), penWidth), n1.getPos(), n2.getPos());
+                g.DrawLine(new Pen(Color.FromArgb(penAlpha, p.color), penWidth), p.mainNode.getPos(), p.secondaryNode.getPos());
             }
         }
 
-        private void drawNodeEdges(Node n, Graphics g)
+        private void drawNodeEdges(renderParams p, Graphics g)
         {
-            foreach (Node n2 in nodes)
+            foreach (Node n in nodes)
             {
-                drawEdge(n, n2, g);
+                drawEdge(new renderParams(p.layer, p.color, p.mainNode, n), g);
             }
-        }
-
-        private void renderNewNode(Node n)
-        {
-            renderWrapper(n, drawNodeEdges, (int)Layers.Edges);
-            renderWrapper(n, drawNode, (int)Layers.Nodes);
         }
 
         private void addNewNode(Node n)
         {
             nodes.Add(n);
-            renderNewNode(n);
+            renderWrapper(new renderParams(Layer.Edges, EdgeColor, n), drawNodeEdges);
+            renderWrapper(new renderParams(Layer.Nodes, NodeColor, n), drawNode);
         }
 
         #region Total Renders
 
-        private void renderBackdrop(Graphics g)
+        private void renderBackdrop(renderParams p, Graphics g)
         {
-            g.Clear(BackdropColor);
+            g.Clear(p.color);
         }
 
-        private void renderAllEdges(Graphics g)
+        private void renderAllEdges(renderParams p, Graphics g)
         {
             foreach (Node n1 in nodes)
             {
                 foreach (Node n2 in nodes)
                 {
-                    drawEdge(n1, n2, g);
+                    drawEdge(new renderParams(p.layer, p.color, n1, n2), g);
                 }
             }
         }
 
-        private void renderAllNodes(Graphics g)
+        private void renderAllNodes(renderParams p, Graphics g)
         {
             foreach (Node n in nodes)
             {
-                drawNode(n, g);
+                drawNode(new renderParams(p.layer, p.color, n), g);
             }
         }
 
         private void renderAll()
         {
-            renderWrapper(renderBackdrop, (int)Layers.Backdrop, resize: true);
-            renderWrapper(renderAllEdges, (int)Layers.Edges, resize: true);
-            renderWrapper(renderAllNodes, (int)Layers.Nodes, resize: true);
+            renderWrapper(new renderParams(Layer.Backdrop, BackdropColor), renderBackdrop, resize: true);
+            renderWrapper(new renderParams(Layer.Edges, EdgeColor), renderAllEdges, resize: true);
+            renderWrapper(new renderParams(Layer.Nodes, NodeColor), renderAllNodes, resize: true);
         }
 
         #endregion
@@ -264,14 +215,14 @@ namespace NodeMaker
 
         readonly static Color SelectedNodeColor = Color.Green;
 
-        private void selectNode(Node n, Graphics g)
+        private void selectNode(Node n)
         {
-            drawNodeAtLocation(n.getPos(), SelectedNodeColor, g);
+            renderWrapper(new renderParams(Layer.Nodes, SelectedNodeColor, n), drawNode);
         }
 
-        private void deselectNode(Node n, Graphics g)
+        private void deselectNode(Node n)
         {
-            drawNode(n, g);
+            renderWrapper(new renderParams(Layer.Nodes, NodeColor, n), drawNode);
         }
 
         private void canvas_MouseMove(object sender, MouseEventArgs e)
@@ -292,10 +243,10 @@ namespace NodeMaker
                     switch (n.state) 
                     {
                         case State.Hover:
-                            renderWrapper(n, selectNode, (int)Layers.Nodes);
+                            selectNode(n);
                             break;
                         case State.None:
-                            renderWrapper(n, deselectNode, (int)Layers.Nodes);
+                            deselectNode(n);
                             break;
                     }
                 }
@@ -303,19 +254,6 @@ namespace NodeMaker
         }
 
         #endregion
-
-        public enum Layers
-        {
-            Backdrop,
-            Edges,
-            Nodes
-        }
-
-        public enum State
-        {
-            None,
-            Hover
-        }
 
         public class Node
         {
@@ -362,6 +300,8 @@ namespace NodeMaker
 
         }
 
+        #region Structs
+
         public struct doubleVector
         {
             public double X;
@@ -372,6 +312,41 @@ namespace NodeMaker
                 Y = y;
             }
         }
+
+        public struct renderParams
+        {
+            public Node mainNode;
+            public Node secondaryNode;
+            public Color color;
+            public Layer layer;
+
+            public renderParams(Layer l, Color c, Node m = null, Node s = null)
+            {
+                mainNode = m;
+                secondaryNode = s;
+                color = c;
+                layer = l;
+            }
+        }
+
+        #endregion
+
+        #region Enums
+
+        public enum Layer
+        {
+            Backdrop,
+            Edges,
+            Nodes
+        }
+
+        public enum State
+        {
+            None,
+            Hover
+        }
+
+        #endregion
     }
 }
 
