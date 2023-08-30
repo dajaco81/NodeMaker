@@ -46,6 +46,19 @@ namespace NodeMaker
         #region Updates and Rendering
         private void tickNodeLocations()
         {
+            
+            foreach (Node n1 in nodes)
+            {
+                foreach (Node n2 in nodes)
+                {
+                    if (n1 != n2)
+                    {
+                        n1.modifyVelocity(n2.location);
+                    }
+                }
+            }
+            
+
             foreach (Node n in nodes)
             {
                 n.tick();
@@ -98,15 +111,12 @@ namespace NodeMaker
             canvas.Image = frameBuffer;
         }
 
-        private int getDistance(Point p1, Point p2)
+        public static int getDistance(Point p1, Point p2)
         {
             return (int)Math.Sqrt(Math.Pow((p1.X - p2.X), 2) + Math.Pow((p1.Y - p2.Y), 2));
         }
 
-        private Point getMidCanvas()
-        {
-            return new Point(canvas.Width / 2, canvas.Height / 2);
-        }
+
 
         #endregion
 
@@ -136,7 +146,7 @@ namespace NodeMaker
     public class Node
     {
         private doubleVector velocity;
-        private doubleVector location;
+        public doubleVector location;
         private Size container;
         private Random r = new Random();
 
@@ -144,7 +154,8 @@ namespace NodeMaker
         {
             setContainer(containerSize);
 
-            setVelocity(r.NextDouble() * (5 - -5) + -5, r.NextDouble() * (5 - -5) + -5);
+            //setVelocity(r.NextDouble() * (5 - -5) + -5, r.NextDouble() * (5 - -5) + -5);
+            setVelocity(0,0);
 
             setPos(Location);
         }
@@ -170,6 +181,25 @@ namespace NodeMaker
         {
             velocity.X = x;
             velocity.Y = y;
+        }
+
+        public void modifyVelocity(doubleVector l)
+        {
+            int dist = Main.getDistance(new Point((int)location.X, (int)location.Y), new Point((int)l.X, (int)l.Y));
+            double power = 500 - dist;
+            if (power < 0) 
+            {
+                power = 0;
+            }
+            power = Math.Sqrt(power);
+            double dx = location.X - l.X;
+            double dy = location.Y - l.Y;
+
+            velocity.X -= 0.0001 * dx * power;
+            velocity.Y -= 0.0001 * dy * power;
+
+            //velocity.X = 0.999 * velocity.X;
+            //velocity.Y = 0.999 * velocity.Y;
         }
 
         public void tick()
