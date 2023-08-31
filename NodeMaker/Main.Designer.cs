@@ -53,6 +53,7 @@
             this.Text = "Nodes";
             this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.Load += new System.EventHandler(this.Main_Load);
+            this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.FormKeyDown);
             this.Resize += new System.EventHandler(this.FormResize);
             ((System.ComponentModel.ISupportInitialize)(this.canvas)).EndInit();
             this.ResumeLayout(false);
